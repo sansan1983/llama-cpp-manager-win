@@ -1,13 +1,11 @@
 @echo off
-setlocal EnableDelayedExpansion
-
-echo.
-echo ================================================
+chcp 65001 >nul
+echo ==================================================
 echo   Llama.cpp Manager - Windows 构建脚本
-echo ================================================
+echo ==================================================
 echo.
 
-REM 检查 Python
+:: 检查 Python
 python --version >nul 2>&1
 if errorlevel 1 (
     echo [错误] 未找到 Python，请先安装 Python 3.10+
@@ -16,105 +14,72 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM 安装依赖
+:: 安装依赖
 echo [1/4] 安装依赖...
-pip install pyinstaller PyQt6 requests
+pip install pyinstaller PyQt6 requests -q
 if errorlevel 1 (
     echo [错误] 依赖安装失败
     pause
     exit /b 1
 )
 
-REM 生成 spec 文件
-echo [2/4] 生成配置...
-python -c "
-import os, sys
-from pathlib import Path
+:: 清理旧构建
+echo.
+echo [2/4] 清理旧构建...
+if exist "build" rmdir /s /q build
+if exist "dist" rmdir /s /q dist
+if exist "LlamaCppManager.exe" del /q LlamaCppManager.exe
 
-project_dir = Path(sys.argv[1])
-spec_content = '''# -*- mode: python ; coding: utf-8 -*-
-import sys
-import os
-from pathlib import Path
+:: 执行打包
+echo.
+echo [3/4] 执行打包...
+pyinstaller ^
+    --name=LlamaCppManager ^
+    --windowed ^
+    --onefile ^
+    --noconfirm ^
+    --distpath=dist ^
+    --workpath=build ^
+    --add-data=resources;resources ^
+    --hidden-import=PyQt6 ^
+    --hidden-import=PyQt6.QtCore ^
+    --hidden-import=PyQt6.QtGui ^
+    --hidden-import=PyQt6.QtWidgets ^
+    --hidden-import=requests ^
+    --collect-submodules=PyQt6 ^
+    --collect-binaries=PyQt6 ^
+    src\main.py
 
-block_cipher = None
-project_dir = Path(r\"%s\")
-src_dir = project_dir / \"src\"
-resources_dir = project_dir / \"resources\"
-
-a = Analysis(
-    [str(src_dir / \"main.py\")],
-    pathex=[str(src_dir)],
-    binaries=[],
-    datas=[
-        (str(resources_dir), \"resources\"),
-    ],
-    hiddenimports=[
-        \"PyQt6.QtCore\",
-        \"PyQt6.QtGui\",
-        \"PyQt6.QtWidgets\",
-        \"requests\",
-    ],
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
-    noarchive=False,
+if errorlevel 1 (
+    echo.
+    echo [错误] 打包失败!
+    pause
+    exit /b 1
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name=\"LlamaCppManager\",
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,
-    console=False,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=False,
-    name=\"LlamaCppManager\",
-)
-''' % project_dir
-
-with open(project_dir / 'llama_manager.spec', 'w', encoding='utf-8') as f:
-    f.write(spec_content)
-print('Spec file created')
-' "%cd%"
-
-REM PyInstaller 构建
-echo [3/4] 打包应用程序...
-pyinstaller llama_manager.spec --noconfirm
-
+:: 整理输出
+echo.
 echo [4/4] 整理输出...
 if not exist "output" mkdir output
-xcopy /E /Y /I "dist\LlamaCppManager" "output\LlamaCppManager-win"
-copy README.md "output\LlamaCppManager-win\"
+if not exist "output\LlamaCppManager-win" mkdir output\LlamaCppManager-win
+
+:: 复制文件
+copy dist\LlamaCppManager.exe output\LlamaCppManager-win\ /y
+copy README.md output\LlamaCppManager-win\ /y 2>nul
+copy requirements.txt output\LlamaCppManager-win\ /y 2>nul
+copy 版本说明.txt output\LlamaCppManager-win\ /y 2>nul
+
+:: 复制 resources
+if exist "resources" (
+    if not exist "output\LlamaCppManager-win\resources" mkdir output\LlamaCppManager-win\resources
+    xcopy /s /y resources\* output\LlamaCppManager-win\resources\ >nul 2>&1
+)
 
 echo.
-echo ================================================
+echo ==================================================
 echo   构建完成!
-echo   输出目录: %cd%\output\LlamaCppManager-win
-echo ================================================
+echo   输出目录: %CD%\output\LlamaCppManager-win
+echo   可执行文件: %CD%\output\LlamaCppManager-win\LlamaCppManager.exe
+echo ==================================================
 echo.
-
 pause

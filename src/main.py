@@ -321,28 +321,43 @@ class LlamaCppTrayApp(QApplication):
 
 def main():
     """主入口"""
-    # 启用高 DPI
+    write_log("Setting high DPI policy...")
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
     
+    write_log("Creating application...")
     app = LlamaCppTrayApp(sys.argv)
     
-    # 设置样式
+    write_log("Setting style...")
     app.setStyle("Fusion")
     
-    return app.exec()
+    write_log("Entering event loop...")
+    ret = app.exec()
+    
+    write_log(f"Event loop exited with code: {ret}")
+    return ret
 
 
 if __name__ == "__main__":
     try:
-        write_log("Application starting...")
+        write_log("=== Application START ===")
+        write_log(f"Python: {sys.version}")
+        write_log(f"Platform: {sys.platform}")
+        write_log(f"Executable: {sys.executable}")
+        write_log(f"CWD: {os.getcwd()}")
+        write_log(f"Args: {sys.argv}")
+        
         ret = main()
-        write_log(f"Application exited with code: {ret}")
+        write_log(f"=== Application END (code: {ret}) ===")
         sys.exit(ret)
     except Exception as e:
+        import traceback
         error_msg = f"FATAL ERROR: {e}\n{traceback.format_exc()}"
         write_log(error_msg)
+        
+        # 同时打印到 stderr
         print(error_msg, file=sys.stderr)
-        input("按回车键退出...")  # 防止窗口一闪而过
-        sys.exit(1)
+        sys.stderr.flush()
+        
+        input("按回车键退出...")

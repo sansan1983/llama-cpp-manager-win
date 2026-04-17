@@ -11,13 +11,14 @@ from pathlib import Path
 
 def ensure_deps():
     """确保依赖已安装"""
+    import shutil
     required = ["pyinstaller", "PyQt6", "requests"]
     for pkg in required:
         try:
             __import__(pkg.replace("-", "_").lower())
         except ImportError:
             print(f"安装 {pkg}...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
+            subprocess.check_call(["uv", "pip", "install", pkg, "-i", "https://pypi.tuna.tsinghua.edu.cn/simple"])
 
 
 def build():
@@ -43,27 +44,30 @@ def build():
     # 直接调用 pyinstaller，不依赖 spec 文件
     print("\n[3/5] 执行打包...")
     
+    # 根据系统选择正确的分隔符
+    import platform
+    sep = ";" if platform.system() == "Windows" else ":"
+    
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--name=LlamaCppManager",
-        "--console",  # 先用控制台模式，方便看到错误
+        "--console",  # 控制台模式，方便调试
         "--onefile",
         "--noconfirm",
         "--distpath=dist",
         "--workpath=build",
         "--specpath=.",
-        "--add-data=resources;resources",
+        f"--add-data=resources{sep}resources",
+        # PyQt6 核心模块
+        "--hidden-import=PyQt6",
         "--hidden-import=PyQt6.QtCore",
         "--hidden-import=PyQt6.QtGui",
         "--hidden-import=PyQt6.QtWidgets",
         "--hidden-import=requests",
-        "--hidden-import=json",
-        "--hidden-import=os",
-        "--hidden-import=subprocess",
-        "--hidden-import=threading",
-        "--hidden-import=pathlib",
+        # 收集 PyQt6 所有子模块
         "--collect-submodules=PyQt6",
-        "--collect-submodules=PyQt6.Qt5",
+        # 收集 PyQt6 插件
+        "--collect-binaries=PyQt6",
         "src/main.py",
     ]
     
@@ -80,12 +84,17 @@ def build():
     
     src_dist = project_dir / "dist" / "LlamaCppManager"
     if src_dist.exists():
-        for item in src_dist.iterdir():
-            dest = output_dir / item.name
-            if item.is_dir():
-                shutil.copytree(item, dest, dirs_exist_ok=True)
-            else:
-                shutil.copy2(item, dest)
+        # 单文件模式：直接复制
+        if src_dist.is_file():
+            dest = output_dir / "LlamaCppManager.exe"
+            shutil.copy2(src_dist, dest)
+        else:
+            for item in src_dist.iterdir():
+                dest = output_dir / item.name
+                if item.is_dir():
+                    shutil.copytree(item, dest, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(item, dest)
     
     # 复制 README 和资源
     for f in ["README.md", "requirements.txt"]:
