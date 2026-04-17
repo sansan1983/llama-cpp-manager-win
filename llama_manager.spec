@@ -1,9 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_all
+import sys
+import os
 
 block_cipher = None
 
-# Collect all PyQt6 dependencies
+# 获取项目根目录 (兼容 PyInstaller)
+if getattr(sys, 'frozen', False):
+    # 打包后
+    bundle_dir = sys._MEIPASS
+    project_dir = os.path.dirname(sys.executable)
+else:
+    # 开发时
+    project_dir = os.path.dirname(os.path.abspath(__file__))
+
+src_main = os.path.join(project_dir, 'src', 'main.py')
+resources_dir = os.path.join(project_dir, 'resources')
+
 hiddenimports = [
     'PyQt6.QtCore',
     'PyQt6.QtGui',
@@ -17,11 +29,11 @@ hiddenimports = [
 ]
 
 a = Analysis(
-    ['src/main.py'],
-    pathex=[],
+    [src_main],
+    pathex=[os.path.join(project_dir, 'src')],
     binaries=[],
     datas=[
-        ('resources', 'resources'),
+        (resources_dir, 'resources'),
     ],
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -45,14 +57,13 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    console=False,  # No console window for GUI app
+    upx=False,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='resources/icon.ico',
 )
 
 coll = COLLECT(
@@ -61,7 +72,6 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
-    upx_exclude=[],
+    upx=False,
     name='LlamaCppManager',
 )

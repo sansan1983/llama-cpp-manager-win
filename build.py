@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Llama.cpp Manager - 跨平台构建脚本
-支持 Windows (PyInstaller), Linux, macOS
 """
 import os
 import sys
@@ -21,84 +20,6 @@ def ensure_deps():
             subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
 
 
-def write_spec_file():
-    """生成 PyInstaller spec 文件"""
-    spec_content = '''# -*- mode: python ; coding: utf-8 -*-
-import sys
-import os
-from pathlib import Path
-
-block_cipher = None
-
-project_dir = Path(__file__).parent.resolve()
-src_dir = project_dir / "src"
-resources_dir = project_dir / "resources"
-
-a = Analysis(
-    [str(src_dir / "main.py")],
-    pathex=[str(src_dir)],
-    binaries=[],
-    datas=[
-        (str(resources_dir), "resources"),
-    ],
-    hiddenimports=[
-        "PyQt6.QtCore",
-        "PyQt6.QtGui",
-        "PyQt6.QtWidgets",
-        "requests",
-        "json",
-        "os",
-        "subprocess",
-        "threading",
-        "pathlib",
-    ],
-    hookspath=[],
-    hooksconfig={},
-    runtime_hooks=[],
-    excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
-    noarchive=False,
-)
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name='LlamaCppManager',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,
-    console=False,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=False,
-    name='LlamaCppManager',
-)
-'''
-    spec_path = Path(__file__).parent / "llama_manager.spec"
-    with open(spec_path, "w", encoding="utf-8") as f:
-        f.write(spec_content)
-    print(f"Spec 文件已生成: {spec_path}")
-    return spec_path
-
-
 def build():
     """执行构建"""
     print("=" * 50)
@@ -110,31 +31,48 @@ def build():
     os.chdir(project_dir)
     
     # 清理旧构建
-    print("\n[1/4] 清理旧构建...")
+    print("\n[1/5] 清理旧构建...")
     for d in ["build", "dist"]:
         if Path(d).exists():
             shutil.rmtree(d)
     
     # 确保依赖
-    print("\n[2/4] 确保依赖...")
+    print("\n[2/5] 确保依赖...")
     ensure_deps()
     
-    # 生成 spec
-    print("\n[3/4] 生成 PyInstaller 配置...")
-    write_spec_file()
+    # 直接调用 pyinstaller，不依赖 spec 文件
+    print("\n[3/5] 执行打包...")
     
-    # 构建
-    print("\n[4/4] 执行打包...")
-    result = subprocess.run(
-        [sys.executable, "-m", "PyInstaller", "llama_manager.spec", "--noconfirm"],
-        cwd=project_dir
-    )
+    cmd = [
+        sys.executable, "-m", "PyInstaller",
+        "--name=LlamaCppManager",
+        "--windowed",
+        "--onefile",
+        "--noconfirm",
+        "--distpath=dist",
+        "--workpath=build",
+        "--specpath=.",
+        "--add-data=resources;resources",
+        "--hidden-import=PyQt6.QtCore",
+        "--hidden-import=PyQt6.QtGui",
+        "--hidden-import=PyQt6.QtWidgets",
+        "--hidden-import=requests",
+        "--hidden-import=json",
+        "--hidden-import=os",
+        "--hidden-import=subprocess",
+        "--hidden-import=threading",
+        "--hidden-import=pathlib",
+        "src/main.py",
+    ]
+    
+    result = subprocess.run(cmd, cwd=project_dir)
     
     if result.returncode != 0:
         print("\n[错误] 打包失败!")
         sys.exit(1)
     
     # 整理输出
+    print("\n[4/5] 整理输出...")
     output_dir = project_dir / "output" / "LlamaCppManager-win"
     output_dir.mkdir(parents=True, exist_ok=True)
     
@@ -147,10 +85,17 @@ def build():
             else:
                 shutil.copy2(item, dest)
     
-    # 复制 README
-    readme = project_dir / "README.md"
-    if readme.exists():
-        shutil.copy2(readme, output_dir)
+    # 复制 README 和资源
+    for f in ["README.md", "requirements.txt"]:
+        src = project_dir / f
+        if src.exists():
+            shutil.copy2(src, output_dir)
+    
+    # 复制 resources
+    resources_src = project_dir / "resources"
+    resources_dst = output_dir / "resources"
+    if resources_src.exists():
+        shutil.copytree(resources_src, resources_dst, dirs_exist_ok=True)
     
     # 创建版本说明
     version_txt = output_dir / "版本说明.txt"
@@ -172,11 +117,20 @@ def build():
 - CPU 版本: llama-*-bin-win-cpu-x64.zip
 
 配置文件位置: %APPDATA%\\LlamaCppManager\\config.json
+
+快速开始:
+1. 运行程序
+2. 点击"设置" -> "下载 llama.cpp"
+3. 选择 HuggingFace GGUF 模型 (如 Qwen3.5-9B-GGUF)
+4. 点击"启动服务器"
+5. 使用 http://localhost:8080 访问 API
 """)
     
+    print("\n[5/5] 完成!")
     print("\n" + "=" * 50)
     print(f"  构建完成!")
     print(f"  输出目录: {output_dir}")
+    print(f"  可执行文件: {output_dir / 'LlamaCppManager.exe'}")
     print("=" * 50)
 
 
