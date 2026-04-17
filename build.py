@@ -46,7 +46,7 @@ def build():
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--name=LlamaCppManager",
-        "--windowed",
+        "--console",  # 先用控制台模式，方便看到错误
         "--onefile",
         "--noconfirm",
         "--distpath=dist",
@@ -62,6 +62,8 @@ def build():
         "--hidden-import=subprocess",
         "--hidden-import=threading",
         "--hidden-import=pathlib",
+        "--collect-submodules=PyQt6",
+        "--collect-submodules=PyQt6.Qt5",
         "src/main.py",
     ]
     

@@ -6,6 +6,7 @@ import sys
 import os
 import threading
 import subprocess
+import traceback
 from pathlib import Path
 
 # 导入 PyQt6
@@ -20,6 +21,25 @@ from PyQt6.QtGui import QIcon, QAction, QPixmap, QPainter, QColor
 from config_manager import ConfigManager, get_config_path
 from process_manager import LlamaProcessManager, ServerState
 from settings_window import SettingsWindow
+
+
+def get_log_path():
+    """获取日志文件路径"""
+    log_dir = Path(os.getenv("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "LlamaCppManager" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir / "app.log"
+
+
+def write_log(msg):
+    """写日志"""
+    try:
+        log_path = get_log_path()
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{timestamp}] {msg}\n")
+    except:
+        pass
 
 
 def create_default_icon() -> QIcon:
@@ -311,8 +331,18 @@ def main():
     # 设置样式
     app.setStyle("Fusion")
     
-    sys.exit(app.exec())
+    return app.exec()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        write_log("Application starting...")
+        ret = main()
+        write_log(f"Application exited with code: {ret}")
+        sys.exit(ret)
+    except Exception as e:
+        error_msg = f"FATAL ERROR: {e}\n{traceback.format_exc()}"
+        write_log(error_msg)
+        print(error_msg, file=sys.stderr)
+        input("按回车键退出...")  # 防止窗口一闪而过
+        sys.exit(1)
